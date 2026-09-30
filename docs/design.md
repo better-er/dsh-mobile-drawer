@@ -12,7 +12,7 @@ dsh 的窄屏布局把侧栏收起成一条 56 像素宽的全高图标栏，桌
 
 ## 内置窄屏机制
 
-对齐 dsh 0.1.7-rc.2 的 `packages/client`：
+对齐 dsh 0.2.0-rc.2 的 `packages/client`：
 
 - `ui-layout` 的 `columns.ts` 定义 `SIDEBAR_AUTO_COLLAPSE = 1024` 与 `SIDEBAR_COLLAPSED = 56`。
 - `ui-layout` 的 `AppFrame.tsx` 在 `viewport < 1024` 时判定窄屏，收起态把侧栏列设为 56 像素，并把 `data-sidebar-collapsed` 挂在网格框上，另用 `data-rightbar-collapsed` 表示右栏无轨道。网格的 `grid-template-columns` 是行内样式。
@@ -83,7 +83,7 @@ dsh 的窄屏布局把侧栏收起成一条 56 像素宽的全高图标栏，桌
 
 ## 版本契约
 
-插件按 `@deepseek-ai/dsh@^0.1.7-rc.2` 固定，用到的 DOM 契约如下，全部来自内置布局的稳定属性而不是 CSS Module 的哈希类名：
+插件按 `@deepseek-ai/dsh@^0.2.0-rc.2` 固定，用到的 DOM 契约如下，全部来自内置布局的稳定属性而不是 CSS Module 的哈希类名：
 
 | 契约 | 来源 | 用途 |
 | --- | --- | --- |

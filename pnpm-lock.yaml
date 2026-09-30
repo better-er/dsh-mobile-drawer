@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@deepseek-ai/dsh-client-ui-layout':
-        specifier: 0.1.7-rc.2
-        version: 0.1.7-rc.2
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2
       '@types/node':
         specifier: ^22.20.1
         version: 22.20.4
@@ -23,8 +23,8 @@ importers:
 
 packages:
 
-  '@deepseek-ai/dsh-client-ui-layout@0.1.7-rc.2':
-    resolution: {integrity: sha512-od2Q5A3SxiOO5V1Mi35lmm64LQLNjew+HgigjTC9oLpCkb+es739VQeWPdUnzWP/+4WVIyQ2+SbHMLZiyB5jVg==}
+  '@deepseek-ai/dsh-client-ui-layout@0.2.0-rc.2':
+    resolution: {integrity: sha512-OZzGxqoAV5zHPgFveJnw599J0j0pWbJiD5c5hdPeLyNMdRdTa2CC2gR7fbn63XGu08O+OruTDXHkCrOVuvkdQw==}
     peerDependencies:
       '@deepseek-ai/cordis': ~4.0.4
 
@@ -410,7 +410,7 @@ packages:
 
 snapshots:
 
-  '@deepseek-ai/dsh-client-ui-layout@0.1.7-rc.2': {}
+  '@deepseek-ai/dsh-client-ui-layout@0.2.0-rc.2': {}
 
   '@oxc-project/types@0.151.0': {}
 
