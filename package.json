@@ -1,6 +1,6 @@
 {
   "name": "dsh-mobile-drawer",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "「DSH·手机适配」：窄屏下把侧栏收起为悬浮小方块，点会话自动收起，并压掉切会话时的自动聚焦，避免软键盘顶起页面。",
   "keywords": [
     "deepseek-harness",

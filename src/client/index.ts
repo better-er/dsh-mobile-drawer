@@ -41,28 +41,25 @@ const COLLAPSED_ATTR = 'data-sidebar-collapsed'
 /** 会话行的稳定标记，值形如 session:<id>。 */
 const SESSION_ROW_SELECTOR = '[data-row-key^="session:"]'
 
-/** 拿不到内置图标时的回退方块图标。 */
-const FALLBACK_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-  + '<rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path></svg>'
-
 /**
  * 只在窄屏生效的样式。
  *
  * 收起态把侧栏列压到零宽，中央区拿回整幅宽度；悬浮方块复用主题语义令牌，跟随明暗与圆角规范。
+ * 收起态的这些副作用都挂在 body 的收起类上，拿不到内置图标、方块不显示时一并跳过，侧栏保持内置形态，不会出现收起了却没有展开入口的局面。
  */
 const STYLE = [
   '@media (max-width: 1023.98px) {',
-  '  [data-rightbar-collapsed] {',
+  '  body:is(.dsh-mobile-drawer-collapsed, .dsh-mobile-drawer-expanded) [data-rightbar-collapsed] {',
   '    grid-template-columns: 0px minmax(0px, 1fr) 0px !important;',
   '  }',
-  '  [data-sidebar-collapsed] > div:first-child {',
+  '  body.dsh-mobile-drawer-collapsed [data-sidebar-collapsed] > div:first-child {',
   '    visibility: hidden;',
   '  }',
-  '  [data-rightbar-collapsed]:not([data-sidebar-collapsed]) > div:first-child {',
+  '  body.dsh-mobile-drawer-expanded [data-rightbar-collapsed]:not([data-sidebar-collapsed]) > div:first-child {',
   '    position: relative;',
   '    overflow: visible;',
   '  }',
-  '  [data-rightbar-collapsed]:not([data-sidebar-collapsed]) [data-slot="sidebar"] > div {',
+  '  body.dsh-mobile-drawer-expanded [data-rightbar-collapsed]:not([data-sidebar-collapsed]) [data-slot="sidebar"] > div {',
   '    position: absolute;',
   '    top: 0;',
   '    bottom: 0;',
@@ -146,7 +143,7 @@ export function apply(ctx: MobileContext): void {
     fab.type = 'button'
     fab.className = FAB_CLASS
     fab.setAttribute('aria-label', '展开侧栏')
-    fab.innerHTML = FALLBACK_ICON
+    // 图标只能在克隆到内置标记后填入；拿不到就不显示这个方块。
     document.body.append(fab)
 
     /** 已应用到方块上的图标标记，避免每次更新都重建 SVG。 */
@@ -160,27 +157,26 @@ export function apply(ctx: MobileContext): void {
     /** rAF 节流标志。 */
     let scheduled = false
 
-    /** 取方块图标：优先复用内置 rail 的 toggle 图标，拿不到时退回方块图标。 */
-    const currentIconMarkup = (): string => {
+    /** 取方块图标：复用内置 rail 的 toggle 图标；拿不到就不显示方块，不自造图标。 */
+    const currentIconMarkup = (): string | undefined => {
       if (builtinIcon !== undefined) return builtinIcon
       const found = document.querySelector('[' + COLLAPSED_ATTR + '] > div:first-child button svg')
       if (found instanceof SVGElement) {
         builtinIcon = found.outerHTML
         return builtinIcon
       }
-      return FALLBACK_ICON
+      return undefined
     }
 
-    /** 按窄屏、收起与抽屉展开状态切换方块与遮罩，并同步方块图标。 */
+    /** 按窄屏、收起与抽屉展开状态切换方块与遮罩；没有内置图标可克隆时方块不出现。 */
     const update = (): void => {
       const narrow = media.matches
       const collapsed = document.querySelector('[' + COLLAPSED_ATTR + ']') !== null
       const canOverlay = narrow && document.querySelector('[data-rightbar-collapsed]') !== null
-      const showFab = narrow && collapsed
-      document.body.classList.toggle(COLLAPSED_CLASS, showFab)
+      const markup = narrow && collapsed ? currentIconMarkup() : undefined
+      document.body.classList.toggle(COLLAPSED_CLASS, markup !== undefined)
       document.body.classList.toggle(EXPANDED_CLASS, canOverlay && !collapsed)
-      if (!showFab) return
-      const markup = currentIconMarkup()
+      if (markup === undefined) return
       if (appliedIcon === markup) return
       appliedIcon = markup
       fab.innerHTML = markup
