@@ -1,13 +1,14 @@
 {
   "name": "dsh-mobile-drawer",
-  "version": "0.1.2",
-  "description": "「DSH·手机适配」：窄屏下把侧栏收起为悬浮小方块，点会话自动收起，并压掉切会话时的自动聚焦，避免软键盘顶起页面。",
+  "version": "0.2.0",
+  "description": "「DSH·手机适配」：窄屏下把侧栏收起为悬浮小方块，点会话自动收起，压掉切会话时的自动聚焦，并在输入框补一排手机键盘上没有的按键。",
   "keywords": [
     "deepseek-harness",
     "dsh",
     "dsh-plugin",
     "mobile",
-    "sidebar"
+    "sidebar",
+    "input"
   ],
   "repository": {
     "type": "git",
@@ -46,7 +47,8 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-ui-layout"
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-conversation"
       ]
     }
   },
@@ -57,11 +59,16 @@
   },
   "peerDependencies": {
     "@deepseek-ai/dsh": "^0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-ui-layout": "^0.2.0-rc.2"
+    "@deepseek-ai/dsh-client-ui-conversation": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-layout": "^0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.2.0-rc.2"
   },
   "devDependencies": {
+    "@deepseek-ai/dsh-client-ui-conversation": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-layout": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
     "@types/node": "^22.20.1",
+    "@types/react": "~18.3.1",
     "tsdown": "^0.23.0",
     "typescript": "^5.9.3"
   }
