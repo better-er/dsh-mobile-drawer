@@ -1,24 +1,27 @@
 /**
  * dsh-mobile-drawer 的浏览器半身。
  *
- * 只对窄屏，也就是手机，做三件内置布局没提供的事，宽屏一律不碰：
+ * 只对窄屏，也就是手机，做四件内置布局没提供的事，宽屏一律不碰：
  * 1. 收起态不再保留 56px 全高图标栏，改成零宽列加左上角一个悬浮方块，点方块展开；
  * 2. 在展开的侧栏里点会话行，自动收起侧栏，把屏幕让回对话；
- * 3. 切会话后输入框会无条件夺回焦点，手机上这会弹出软键盘并把页面顶起，这里把紧随会话点击的那一次聚焦压掉。
+ * 3. 切会话后输入框会无条件夺回焦点，手机上这会弹出软键盘并把页面顶起，这里把紧随会话点击的那一次聚焦压掉；
+ * 4. 输入框工具行补一排手机键盘上没有的键，见 ./keys.tsx。
  *
- * 三条都走 DOM：内置布局没有面向插件的窄屏幂等收起入口，也没有会话切换广播。
+ * 前三条走 DOM：内置布局没有面向插件的窄屏幂等收起入口，也没有会话切换广播。
  * 与其重写 AppFrame 外壳，不如在客户端半身做副作用，卸载时全部撤销。
  *
  * @module dsh-mobile-drawer/client
  */
 
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
+import { applyKeys } from './keys'
+import type { KeysContext } from './keys'
 
 /** 插件名，同时也是配置项 id。 */
 export const name = 'dsh-mobile-drawer'
 
-/** 本插件需要的客户端服务：只借布局控制器翻转窄屏侧栏。 */
-export const inject = ['layout']
+/** 本插件需要的客户端服务：借布局控制器翻转窄屏侧栏，借 slots 往工具行加键位组。 */
+export const inject = ['layout', 'slots']
 
 /** 与 ui-layout 的 SIDEBAR_AUTO_COLLAPSE 对齐：视口小于 1024 像素视为窄屏。 */
 const NARROW_QUERY = '(max-width: 1023.98px)'
@@ -117,9 +120,8 @@ const STYLE = [
 ].join('\n')
 
 /** 客户端上下文里本插件用得到的一小片。 */
-interface MobileContext {
+interface MobileContext extends KeysContext {
   readonly layout: ILayout
-  effect(callback: () => (() => void) | void, label?: string): void
 }
 
 /**
@@ -287,4 +289,6 @@ export function apply(ctx: MobileContext): void {
       suppressHits = 0
     }
   }, 'dsh-mobile-drawer：窄屏侧栏与聚焦压制')
+
+  applyKeys(ctx)
 }

@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsdown'
 
 /** 浏览器半身的外部依赖：由 shell 的单例模块表提供，不能打进 bundle。 */
-const CLIENT_EXTERNALS = ['@deepseek-ai/cordis']
+const CLIENT_EXTERNALS = ['@deepseek-ai/cordis', 'react', 'react/jsx-runtime']
 const ID = 'dsh-mobile-drawer'
 
 export default defineConfig([
