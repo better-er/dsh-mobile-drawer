@@ -119,8 +119,19 @@ dsh 的窄屏布局把侧栏收起成一条 56 像素宽的全高图标栏，桌
 | `[data-row-key^="session:"]` | ui-workspace 会话行 | 识别会话点击 |
 | `[data-slot="sidebar"]` | ui-sidebar 槽位 | 定位侧栏根节点 |
 | `conversation.input.dock` | ui-conversation 槽位 | 只为借它拿到会话作用域的 inputActions，按键条本身不渲染在这里 |
+| `style[data-plugin]` | client 模块系统 | 注入的样式必须自带归属标记，见下节 |
 
 哈希类名一律不直接依赖；只有克隆图标时按结构取内置收起栏的第一个按钮里的 SVG。
+
+## 样式必须自带归属标记
+
+两个注入的 `<style>` 都要写 `data-plugin="dsh-mobile-drawer"`，不是可选的美化。
+
+client 模块系统在实例化任何一个插件时都会跑 `claimStyles`，把页面上所有**没有** `data-plugin` 的 `<style>` 认领给当时正在实例化的那个插件；那个插件一重载，`removeOwnedStyles` 就按 id 把这批样式一起删掉。
+
+插件要等到 `apply` 挂载时才建样式，早已错过自己那次 `claimStyles`，所以不标记就是一份无主样式，谁实例化得晚就归谁。被收走之后，本插件的一切样式凭空消失：42 像素方块和按键条退回浏览器默认按钮，`position: fixed` 一并失效，元素落进文档流尾巴，把页面撑高，要滚到最下面才看得见——Dsh 上表现为窗口左下角多出一排灰色按钮。
+
+带上 `data-plugin` 之后既不会被别人认领，卸载时也能被 `removeOwnedStyles` 正确回收。
 
 ## 已知限制
 
