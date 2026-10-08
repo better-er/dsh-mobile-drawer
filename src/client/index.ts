@@ -134,6 +134,11 @@ export function apply(ctx: MobileContext): void {
     const media = window.matchMedia(NARROW_QUERY)
     const style = document.createElement('style')
     style.id = 'dsh-mobile-drawer-style'
+    // 必须自带 data-plugin：client 模块系统实例化任何一个插件时，都会把页面上所有没有这个
+    // 属性的 <style> 认领给那个插件，它一重载就被 removeOwnedStyles 一并删掉，这里的样式
+    // 又会退回浏览器默认，方块与按键条掉进文档流底部。带上属性才不会被人认领。
+    style.dataset.plugin = name
+    style.dataset.pluginCss = name + '/client.css'
     style.textContent = STYLE
     document.head.append(style)
 

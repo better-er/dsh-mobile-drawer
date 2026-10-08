@@ -24,6 +24,9 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 /** 挂当前实例监听用的名字：热更新时旧实例未必被完整卸载，留着会两份叠着处理同一次按键。 */
 const MOUNT_SLOT = '__dshMobileDrawerKeysAbort'
 
+/** 插件包名，注入样式时用作归属标记，理由见 applyKeys 里的说明。 */
+const PACKAGE_NAME = 'dsh-mobile-drawer'
+
 /** 键位组容器类名，样式一次注入。 */
 const ROW_CLASS = 'dsh-mobile-drawer-keys'
 
@@ -295,6 +298,9 @@ export function applyKeys(ctx: KeysContext): void {
   ctx.effect(() => {
     const style = document.createElement('style')
     style.id = 'dsh-mobile-drawer-keys-style'
+    // 与 index.ts 同理：不带 data-plugin 的样式会被任何插件实例化时认领走，随后被删。
+    style.dataset.plugin = PACKAGE_NAME
+    style.dataset.pluginCss = PACKAGE_NAME + '/client-keys.css'
     style.textContent = STYLE
     document.head.append(style)
     return () => {
