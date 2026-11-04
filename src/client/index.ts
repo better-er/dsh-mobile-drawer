@@ -32,6 +32,106 @@ const FOCUS_SUPPRESS_MS = 1500
 /** 悬浮方块按钮的类名。 */
 const FAB_CLASS = 'dsh-mobile-drawer-fab'
 
+/** 方块的边长，与样式里的宽高一致，算停靠坐标要用。 */
+const FAB_SIZE = 44
+
+/** 方块离视口边缘的基准距离，与安全区叠加。 */
+const FAB_GAP = 10
+
+/** 方块中心离两条边都近于这个像素数时吸到角，否则只吸最近的一条边。 */
+const CORNER_REACH = 48
+
+/** 手指位移超过这个像素数才算拖动，短于它仍当作点击，避免手抖把方块挪走。 */
+const DRAG_THRESHOLD = 8
+
+/** 拖动时方块与视口边缘之间至少留出的像素。 */
+const DRAG_EDGE_MARGIN = 4
+
+/** 记住停靠位的本地存储键。 */
+const DOCK_KEY = 'dsh-mobile-drawer:fab-dock'
+
+/** 方块可以停靠的位置：四角与四边。 */
+type FabDockEdge = 'tl' | 'tr' | 'bl' | 'br' | 'left' | 'right' | 'top' | 'bottom'
+
+/** 停靠位。边停靠时 ratio 是沿边位置的比例，0 到 1；角停靠时不用。 */
+interface FabDock {
+  readonly edge: FabDockEdge
+  readonly ratio: number
+}
+
+/** 视口四边的安全区，单位像素。 */
+interface ViewInsets {
+  readonly top: number
+  readonly right: number
+  readonly bottom: number
+  readonly left: number
+}
+
+/** 没存过或存坏时的停靠位：左上角。 */
+const DEFAULT_DOCK: FabDock = { edge: 'tl', ratio: 0 }
+
+/** 认识这些停靠边名。 */
+function isDockEdge(value: unknown): value is FabDockEdge {
+  return value === 'tl' || value === 'tr' || value === 'bl' || value === 'br'
+    || value === 'left' || value === 'right' || value === 'top' || value === 'bottom'
+}
+
+/** 读上次记住的停靠位；存储不可用或值不认识时回到左上角。 */
+function readDock(): FabDock {
+  try {
+    const raw = window.localStorage.getItem(DOCK_KEY)
+    if (raw !== null) {
+      const parsed: unknown = JSON.parse(raw)
+      if (typeof parsed === 'object' && parsed !== null) {
+        const record = parsed as Record<string, unknown>
+        if (isDockEdge(record.edge)) {
+          const ratio = Number(record.ratio)
+          return { edge: record.edge, ratio: Number.isFinite(ratio) ? Math.min(1, Math.max(0, ratio)) : 0 }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[dsh-mobile-drawer] 读不到方块的停靠位，改用左上角：' + String(error))
+  }
+  return DEFAULT_DOCK
+}
+
+/** 记住停靠位；写不进去只影响下次启动的位置。 */
+function saveDock(dock: FabDock): void {
+  try {
+    window.localStorage.setItem(DOCK_KEY, JSON.stringify(dock))
+  } catch (error) {
+    console.warn('[dsh-mobile-drawer] 存不下方块的停靠位：' + String(error))
+  }
+}
+
+/** 探一次视口四边的安全区：临时元素上写 env()，再读回计算值。 */
+function readInsets(): ViewInsets {
+  const probe = document.createElement('div')
+  probe.style.cssText = [
+    'position: fixed',
+    'top: 0',
+    'left: 0',
+    'width: 0',
+    'height: 0',
+    'visibility: hidden',
+    'padding-top: env(safe-area-inset-top, 0px)',
+    'padding-right: env(safe-area-inset-right, 0px)',
+    'padding-bottom: env(safe-area-inset-bottom, 0px)',
+    'padding-left: env(safe-area-inset-left, 0px)',
+  ].join(';')
+  document.body.append(probe)
+  const style = getComputedStyle(probe)
+  const insets: ViewInsets = {
+    top: Number.parseFloat(style.paddingTop) || 0,
+    right: Number.parseFloat(style.paddingRight) || 0,
+    bottom: Number.parseFloat(style.paddingBottom) || 0,
+    left: Number.parseFloat(style.paddingLeft) || 0,
+  }
+  probe.remove()
+  return insets
+}
+
 /** 挂在 body 上、表示窄屏且侧栏收起、方块该显示的类名。 */
 const COLLAPSED_CLASS = 'dsh-mobile-drawer-collapsed'
 
@@ -85,8 +185,8 @@ const STYLE = [
   '}',
   '.dsh-mobile-drawer-fab {',
   '  position: fixed;',
-  '  top: calc(env(safe-area-inset-top, 0px) + 10px);',
-  '  left: calc(env(safe-area-inset-left, 0px) + 10px);',
+  '  top: 0;',
+  '  left: 0;',
   '  z-index: 30;',
   '  display: none;',
   '  align-items: center;',
@@ -100,7 +200,12 @@ const STYLE = [
   '  color: var(--dsw-alias-label-primary);',
   '  box-shadow: var(--dsw-elevation-panel);',
   '  cursor: pointer;',
+  '  touch-action: none;',
+  '  user-select: none;',
   '  -webkit-tap-highlight-color: transparent;',
+  '}',
+  '.dsh-mobile-drawer-fab.is-dragging {',
+  '  cursor: grabbing;',
   '}',
   'body.dsh-mobile-drawer-collapsed .dsh-mobile-drawer-fab {',
   '  display: inline-flex;',
@@ -149,7 +254,7 @@ export function apply(ctx: MobileContext): void {
     const fab = document.createElement('button')
     fab.type = 'button'
     fab.className = FAB_CLASS
-    fab.setAttribute('aria-label', '展开侧栏')
+    fab.setAttribute('aria-label', '展开侧栏，拖动可换位置')
     // 图标只能在克隆到内置标记后填入；拿不到就不显示这个方块。
     document.body.append(fab)
 
@@ -199,10 +304,162 @@ export function apply(ctx: MobileContext): void {
       })
     }
 
-    /** 点方块展开侧栏；不冒泡到会话行的处理。 */
+    /** 正在跟手拖动的指针，没按下时为 undefined。 */
+    let dragPointer: number | undefined
+    /** 按下时的指针起点，拖动位移相对它算。 */
+    let dragStartX = 0
+    let dragStartY = 0
+    /** 按下时方块的原始矩形，用来把拖动夹在视口内。 */
+    let dragRect: DOMRect | undefined
+    /** 本次手势是否已越过阈值，成为拖动。 */
+    let dragging = false
+    /** 拖动后的那一次 click 要吞掉，否则松手就展开侧栏。 */
+    let swallowClick = false
+
+    /** 按下只记账，越过阈值才开始拖，轻点仍旧是展开。 */
+    const onFabPointerDown = (event: PointerEvent): void => {
+      if (!event.isPrimary || event.button !== 0) return
+      swallowClick = false
+      dragPointer = event.pointerId
+      dragStartX = event.clientX
+      dragStartY = event.clientY
+      dragRect = fab.getBoundingClientRect()
+      dragging = false
+      fab.setPointerCapture(event.pointerId)
+    }
+
+    /** 视口四边的安全区，窗口尺寸变化时重读。 */
+    let insets = readInsets()
+    /** 当前停靠位。 */
+    let dock = readDock()
+
+    /** 把方块摆到停靠位上；窗口尺寸变化时也走这里重算。 */
+    const place = (): void => {
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const minLeft = insets.left + FAB_GAP
+      const minTop = insets.top + FAB_GAP
+      const maxLeft = Math.max(minLeft, vw - insets.right - FAB_GAP - FAB_SIZE)
+      const maxTop = Math.max(minTop, vh - insets.bottom - FAB_GAP - FAB_SIZE)
+      const spanX = maxLeft - minLeft
+      const spanY = maxTop - minTop
+      const ratio = Math.min(1, Math.max(0, dock.ratio))
+      let left: number
+      let top: number
+      switch (dock.edge) {
+        case 'left':
+          left = minLeft
+          top = minTop + spanY * ratio
+          break
+        case 'right':
+          left = maxLeft
+          top = minTop + spanY * ratio
+          break
+        case 'top':
+          left = minLeft + spanX * ratio
+          top = minTop
+          break
+        case 'bottom':
+          left = minLeft + spanX * ratio
+          top = maxTop
+          break
+        case 'tr':
+          left = maxLeft
+          top = minTop
+          break
+        case 'bl':
+          left = minLeft
+          top = maxTop
+          break
+        case 'br':
+          left = maxLeft
+          top = maxTop
+          break
+        default:
+          left = minLeft
+          top = minTop
+          break
+      }
+      fab.style.left = left + 'px'
+      fab.style.top = top + 'px'
+    }
+
+    /** 窗口尺寸或方向变了，安全区与可停靠范围都会变，重新摆一次。 */
+    const onResize = (): void => {
+      insets = readInsets()
+      place()
+    }
+
+    /** 拖动中让方块跟手，位移夹在视口内，免得拖到屏幕外找不回来。 */
+    const onFabPointerMove = (event: PointerEvent): void => {
+      if (dragPointer !== event.pointerId || dragRect === undefined) return
+      const dx = event.clientX - dragStartX
+      const dy = event.clientY - dragStartY
+      if (!dragging) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return
+        dragging = true
+        fab.classList.add('is-dragging')
+      }
+      const x = Math.min(Math.max(dx, DRAG_EDGE_MARGIN - dragRect.left), window.innerWidth - DRAG_EDGE_MARGIN - dragRect.right)
+      const y = Math.min(Math.max(dy, DRAG_EDGE_MARGIN - dragRect.top), window.innerHeight - DRAG_EDGE_MARGIN - dragRect.bottom)
+      fab.style.transform = 'translate(' + x + 'px, ' + y + 'px)'
+    }
+
+    /**
+     * 松手收尾：没拖动就交给 click，拖过了就吸附并记住。
+     *
+     * 中心同时贴近两条边时吸到那个角，否则只吸最近的一条边，沿边的位置按比例保留。
+     */
+    const onFabPointerUp = (event: PointerEvent): void => {
+      if (dragPointer !== event.pointerId) return
+      dragPointer = undefined
+      if (fab.hasPointerCapture(event.pointerId)) fab.releasePointerCapture(event.pointerId)
+      if (!dragging) return
+      dragging = false
+      fab.classList.remove('is-dragging')
+      const rect = fab.getBoundingClientRect()
+      fab.style.transform = ''
+      const vw = window.innerWidth
+      const vh = window.innerHeight
+      const centerX = rect.left + rect.width / 2
+      const centerY = rect.top + rect.height / 2
+      const reachLeft = centerX
+      const reachRight = vw - centerX
+      const reachTop = centerY
+      const reachBottom = vh - centerY
+      const horizontal = reachLeft <= reachRight ? 'left' : 'right'
+      const vertical = reachTop <= reachBottom ? 'top' : 'bottom'
+      const neckX = Math.min(reachLeft, reachRight)
+      const neckY = Math.min(reachTop, reachBottom)
+      const minLeft = insets.left + FAB_GAP
+      const minTop = insets.top + FAB_GAP
+      const spanX = Math.max(1, vw - insets.right - FAB_GAP - FAB_SIZE - minLeft)
+      const spanY = Math.max(1, vh - insets.bottom - FAB_GAP - FAB_SIZE - minTop)
+      if (neckX < CORNER_REACH && neckY < CORNER_REACH) {
+        dock = {
+          edge: vertical === 'top'
+            ? (horizontal === 'left' ? 'tl' : 'tr')
+            : (horizontal === 'left' ? 'bl' : 'br'),
+          ratio: 0,
+        }
+      } else if (neckX <= neckY) {
+        dock = { edge: horizontal, ratio: Math.min(1, Math.max(0, (rect.top - minTop) / spanY)) }
+      } else {
+        dock = { edge: vertical, ratio: Math.min(1, Math.max(0, (rect.left - minLeft) / spanX)) }
+      }
+      place()
+      saveDock(dock)
+      swallowClick = true
+    }
+
+    /** 点方块展开侧栏；不冒泡到会话行的处理。拖动过的那一次不展开。 */
     const onFabClick = (event: MouseEvent): void => {
       event.preventDefault()
       event.stopPropagation()
+      if (swallowClick) {
+        swallowClick = false
+        return
+      }
       ctx.layout.toggleSidebar()
     }
 
@@ -270,18 +527,29 @@ export function apply(ctx: MobileContext): void {
     })
 
     media.addEventListener('change', schedule)
+    window.addEventListener('resize', onResize)
     scrim.addEventListener('click', onScrimClick)
     fab.addEventListener('click', onFabClick)
+    fab.addEventListener('pointerdown', onFabPointerDown)
+    fab.addEventListener('pointermove', onFabPointerMove)
+    fab.addEventListener('pointerup', onFabPointerUp)
+    fab.addEventListener('pointercancel', onFabPointerUp)
     document.addEventListener('click', onClick, true)
     document.addEventListener('focusin', onFocusIn, true)
     document.addEventListener('pointerdown', onPointerDown, true)
     update()
+    place()
 
     return () => {
       observer.disconnect()
       media.removeEventListener('change', schedule)
+      window.removeEventListener('resize', onResize)
       scrim.removeEventListener('click', onScrimClick)
       fab.removeEventListener('click', onFabClick)
+      fab.removeEventListener('pointerdown', onFabPointerDown)
+      fab.removeEventListener('pointermove', onFabPointerMove)
+      fab.removeEventListener('pointerup', onFabPointerUp)
+      fab.removeEventListener('pointercancel', onFabPointerUp)
       document.removeEventListener('click', onClick, true)
       document.removeEventListener('focusin', onFocusIn, true)
       document.removeEventListener('pointerdown', onPointerDown, true)
